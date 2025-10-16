@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 from typing import Iterable, Mapping, MutableMapping, Sequence
@@ -23,6 +24,44 @@ class AmadeusConfig:
     client_secret: str
     hostname: str = "https://test.api.amadeus.com"
     timeout: float = 10.0
+
+    @classmethod
+    def from_env(cls, *, prefix: str = "AMADEUS_") -> "AmadeusConfig":
+        """Build a configuration by reading credentials from environment variables.
+
+        Parameters
+        ----------
+        prefix:
+            Optional prefix that will be prepended to the environment variable
+            names. By default, the method expects ``AMADEUS_CLIENT_ID`` and
+            ``AMADEUS_CLIENT_SECRET`` to be available in the process
+            environment. ``AMADEUS_HOSTNAME`` and ``AMADEUS_TIMEOUT`` can also
+            be provided to override the default endpoint and timeout.
+
+        Raises
+        ------
+        ValueError
+            If either the client ID or client secret is missing.
+        """
+
+        client_id = os.getenv(f"{prefix}CLIENT_ID")
+        client_secret = os.getenv(f"{prefix}CLIENT_SECRET")
+        missing: list[str] = []
+        if not client_id:
+            missing.append(f"{prefix}CLIENT_ID")
+        if not client_secret:
+            missing.append(f"{prefix}CLIENT_SECRET")
+        if missing:
+            raise ValueError(
+                "Missing required Amadeus credentials in environment: "
+                + ", ".join(missing)
+            )
+
+        hostname = os.getenv(f"{prefix}HOSTNAME") or "https://test.api.amadeus.com"
+        timeout_value = os.getenv(f"{prefix}TIMEOUT")
+        timeout = float(timeout_value) if timeout_value is not None else 10.0
+
+        return cls(client_id=client_id, client_secret=client_secret, hostname=hostname, timeout=timeout)
 
 
 class _AmadeusClient:
