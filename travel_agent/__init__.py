@@ -9,6 +9,13 @@ from .agent import TravelAgent
 from .itinerary import ItineraryPlanner
 from .flights import FlightMonitor
 from .hotels import HotelMonitor
+from .providers import (
+    AmadeusConfig,
+    AmadeusFlightSearchProvider,
+    AmadeusHotelSearchProvider,
+    AmadeusSearchProvider,
+    ProviderError,
+)
 from .models import (
     Activity,
     FlightOffer,
@@ -33,4 +40,9 @@ __all__ = [
     "Itinerary",
     "ItineraryDay",
     "TripRequest",
+    "AmadeusConfig",
+    "AmadeusFlightSearchProvider",
+    "AmadeusHotelSearchProvider",
+    "AmadeusSearchProvider",
+    "ProviderError",
 ]
