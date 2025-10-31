@@ -11,7 +11,7 @@ from typing import Iterable, Mapping, MutableMapping, Sequence
 
 import requests
 
-from .search import CompositeSearchProvider, FlightSearchProvider, HotelSearchProvider
+from search import CompositeSearchProvider, FlightSearchProvider, HotelSearchProvider
 
 
 class ProviderError(RuntimeError):

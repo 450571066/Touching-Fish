@@ -6,8 +6,8 @@ import asyncio
 from datetime import datetime
 from typing import Callable, List, Mapping, Sequence
 
-from .models import FlightOffer, FlightPreference, TripRequest
-from .search import FlightSearchProvider
+from models import FlightOffer, FlightPreference, TripRequest
+from search import FlightSearchProvider
 
 
 class FlightMonitor:

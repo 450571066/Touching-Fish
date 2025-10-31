@@ -6,10 +6,10 @@ import asyncio
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from .agent import TravelAgent
-from .models import FlightPreference, HotelPreference, TripRequest
-from .providers import AmadeusConfig, AmadeusSearchProvider, ProviderError
-from .search import InMemorySearchProvider
+from agent import TravelAgent
+from models import FlightPreference, HotelPreference, TripRequest
+from providers import AmadeusConfig, AmadeusSearchProvider, ProviderError
+from search import InMemorySearchProvider
 
 
 async def main() -> None:

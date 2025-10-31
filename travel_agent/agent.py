@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from .flights import FlightMonitor
-from .hotels import HotelMonitor
-from .itinerary import ItineraryPlanner
-from .models import (
+from flights import FlightMonitor
+from hotels import HotelMonitor
+from itinerary import ItineraryPlanner
+from models import (
     FlightOffer,
     FlightPreference,
     HotelOffer,
@@ -16,7 +16,7 @@ from .models import (
     Itinerary,
     TripRequest,
 )
-from .search import CompositeSearchProvider
+from search import CompositeSearchProvider
 
 
 @dataclass(slots=True)

@@ -6,8 +6,8 @@ import asyncio
 from datetime import date
 from typing import Callable, List, Mapping, Sequence
 
-from .models import HotelOffer, HotelPreference, TripRequest
-from .search import HotelSearchProvider
+from models import HotelOffer, HotelPreference, TripRequest
+from search import HotelSearchProvider
 
 
 class HotelMonitor:

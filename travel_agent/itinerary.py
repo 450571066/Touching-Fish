@@ -6,8 +6,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Sequence
 
-from .models import Activity, Itinerary, ItineraryDay, TripRequest
-from .search import SearchProvider
+from models import Activity, Itinerary, ItineraryDay, TripRequest
+from search import SearchProvider
 
 
 class ItineraryPlanner:
