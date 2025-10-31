@@ -23,11 +23,13 @@ async def main() -> None:
 
     trip = TripRequest(
         origin="HKG",
-        destination="Beijing",
+        destination="BJS",
         start_date=date.today(),
         end_date=date.today() + timedelta(days=3),
         interests=("文化景点", "当地美食"),
         travelers=2,
+        origin_display="Hong Kong",
+        destination_display="Beijing",
     )
 
     itinerary = agent.plan_itinerary(trip)
@@ -90,7 +92,7 @@ def _build_provider() -> tuple[InMemorySearchProvider | AmadeusSearchProvider, C
                 "location": "Great Wall, Beijing",
                 "start_time": datetime.now().isoformat(),
                 "end_time": (datetime.now() + timedelta(hours=6)).isoformat(),
-                "url": "https://example.com/great-wall",
+                "url": "https://www.thechinaguide.com/destination/mutianyu-great-wall",
             }
         ],
         flight_results=[
@@ -101,7 +103,7 @@ def _build_provider() -> tuple[InMemorySearchProvider | AmadeusSearchProvider, C
                 "arrival_time": (datetime.now() + timedelta(hours=3)).isoformat(),
                 "airline": "Air China",
                 "flight_number": "CA123",
-                "booking_url": "https://example.com/ca123",
+                "booking_url": "https://www.airchina.com.cn/en",
                 "loyalty_cost": 18000,
                 "loyalty_program": "Air China PhoenixMiles",
             }
@@ -115,7 +117,7 @@ def _build_provider() -> tuple[InMemorySearchProvider | AmadeusSearchProvider, C
                 "check_out": (date.today() + timedelta(days=3)).isoformat(),
                 "rating": 4.6,
                 "location": "Chaoyang District",
-                "booking_url": "https://example.com/grand-beijing",
+                "booking_url": "https://www.marriott.com/en-us/hotels/bjsbr-the-st-regis-beijing/overview/",
                 "loyalty_cost": 28000,
                 "loyalty_program": "Marriott Bonvoy",
             }

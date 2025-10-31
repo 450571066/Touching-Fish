@@ -18,6 +18,20 @@ class TripRequest:
     interests: Sequence[str] = field(default_factory=tuple)
     travelers: int = 1
     budget: Optional[float] = None
+    origin_display: Optional[str] = None
+    destination_display: Optional[str] = None
+
+    @property
+    def origin_label(self) -> str:
+        """Return a human-friendly label for the origin city or airport."""
+
+        return self.origin_display or self.origin
+
+    @property
+    def destination_label(self) -> str:
+        """Return a human-friendly label for the destination city or airport."""
+
+        return self.destination_display or self.destination
 
 
 @dataclass(slots=True)

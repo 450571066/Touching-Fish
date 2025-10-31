@@ -36,7 +36,7 @@ class ItineraryPlanner:
 
     def _gather_suggestions(self, request: TripRequest) -> Sequence[Activity]:
         queries = [
-            f"{request.destination} {interest}" for interest in (request.interests or ("top sights",))
+            f"{request.destination_label} {interest}" for interest in (request.interests or ("top sights",))
         ]
         suggestions: List[Activity] = []
         for query in queries:

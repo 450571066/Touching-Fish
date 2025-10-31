@@ -421,6 +421,17 @@ class AmadeusHotelSearchProvider(HotelSearchProvider):
         return tuple(results)
 
 
+_ALLOWED_LOCATION_FILTERS = frozenset(
+    {
+        "countryCode",
+        "page[offset]",
+        "page[limit]",
+        "sort",
+        "view",
+    }
+)
+
+
 class AmadeusSearchProvider(CompositeSearchProvider):
     """Composite provider that reuses the same Amadeus credentials for all searches."""
 
@@ -432,7 +443,13 @@ class AmadeusSearchProvider(CompositeSearchProvider):
     def search(self, query: str, *, filters: Mapping[str, object] | None = None) -> Sequence[Mapping[str, object]]:
         params = {"keyword": query, "subType": "AIRPORT,CITY"}
         if filters:
-            params.update(filters)
+            params.update(
+                {
+                    key: value
+                    for key, value in filters.items()
+                    if key in _ALLOWED_LOCATION_FILTERS and value not in (None, "")
+                }
+            )
         response = self._client.get("/v1/reference-data/locations", params=params)
         data = response.get("data", [])
         if not isinstance(data, Iterable):
