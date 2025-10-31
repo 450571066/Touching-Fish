@@ -62,10 +62,8 @@ async def main() -> None:
             cleanup()
 
 
-def _build_provider() -> tuple[DelegatingCompositeSearchProvider | InMemorySearchProvider, Callable[[], None] | None]:
+def _build_provider() -> tuple[InMemorySearchProvider | AmadeusSearchProvider, Callable[[], None] | None]:
     """Prefer a live Amadeus provider when a local config file is available."""
-
-    fallback = _build_fallback_provider()
 
     if os.getenv("TRAVEL_AGENT_EXAMPLE_STUB"):
         stub = _StubAmadeusServer()
@@ -76,25 +74,13 @@ def _build_provider() -> tuple[DelegatingCompositeSearchProvider | InMemorySearc
             hostname=stub.base_url,
             timeout=5.0,
         )
-        amadeus = AmadeusSearchProvider(config)
-        provider = DelegatingCompositeSearchProvider(
-            search_provider=fallback,
-            flight_provider=amadeus,
-            hotel_provider=amadeus,
-        )
-        return provider, stub.stop
+        return AmadeusSearchProvider(config), stub.stop
 
     config_path = Path(__file__).with_name("amadeus_config.json")
     if config_path.exists():
         try:
             config = AmadeusConfig.from_file(config_path)
-            amadeus = AmadeusSearchProvider(config)
-            provider = DelegatingCompositeSearchProvider(
-                search_provider=fallback,
-                flight_provider=amadeus,
-                hotel_provider=amadeus,
-            )
-            return provider, None
+            return AmadeusSearchProvider(config), None
         except (ProviderError, ValueError) as exc:  # pragma: no cover - demo fallback path
             print(f"Failed to initialize Amadeus provider: {exc}")
 
@@ -112,8 +98,8 @@ def _build_fallback_provider() -> InMemorySearchProvider:
                 "title": "Day trip to the Great Wall",
                 "snippet": "Book a private driver to Mutianyu for breathtaking views.",
                 "location": "Great Wall, Beijing",
-                "start_time": now.isoformat(),
-                "end_time": (now + timedelta(hours=6)).isoformat(),
+                "start_time": datetime.now().isoformat(),
+                "end_time": (datetime.now() + timedelta(hours=6)).isoformat(),
                 "url": "https://www.thechinaguide.com/destination/mutianyu-great-wall",
             }
         ],
@@ -144,7 +130,124 @@ def _build_fallback_provider() -> InMemorySearchProvider:
                 "loyalty_program": "Marriott Bonvoy",
             }
         ],
-    )
+    ), None
+
+
+class _StubAmadeusServer:
+    """Serve canned Amadeus responses for environments without internet access."""
+
+    def __init__(self) -> None:
+        self._server = HTTPServer(("127.0.0.1", 0), _StubAmadeusHandler)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+
+    @property
+    def base_url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}"
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._server.shutdown()
+        self._thread.join()
+
+
+class _StubAmadeusHandler(BaseHTTPRequestHandler):
+    """HTTP handler that mimics a subset of the Amadeus API."""
+
+    _TOKEN_RESPONSE = {"access_token": "stub-token", "expires_in": 1800}
+    _FLIGHT_RESPONSE = {
+        "data": [
+            {
+                "itineraries": [
+                    {
+                        "segments": [
+                            {
+                                "departure": {"at": datetime.now().isoformat(timespec="seconds")},
+                                "arrival": {"at": (datetime.now() + timedelta(hours=3)).isoformat(timespec="seconds")},
+                                "carrierCode": "ST",
+                                "number": "123",
+                            }
+                        ]
+                    }
+                ],
+                "price": {"total": "199.99", "currency": "USD"},
+                "links": {"deeplink": "/bookings/flight/abc"},
+                "travelerPricings": [
+                    {
+                        "loyaltyProgramme": {
+                            "program": "Sample Rewards",
+                            "points": 15000,
+                        }
+                    }
+                ],
+            }
+        ]
+    }
+    _HOTEL_RESPONSE = {
+        "data": [
+            {
+                "hotel": {
+                    "name": "Stub Plaza",
+                    "rating": 4.5,
+                    "geoCode": {"latitude": 39.9042, "longitude": 116.4074},
+                },
+                "offers": [
+                    {
+                        "price": {"total": "289.50", "currency": "USD"},
+                        "boardType": "Breakfast",
+                        "room": {"description": {"text": "City view suite"}},
+                        "loyaltyProgramme": {
+                            "program": "Stub Rewards",
+                            "points": 22000,
+                        },
+                        "links": {"deeplink": "/bookings/hotel/xyz"},
+                    }
+                ],
+            }
+        ]
+    }
+    _LOCATION_RESPONSE = {
+        "data": [
+            {
+                "type": "location",
+                "subType": "CITY",
+                "name": "Stub City",
+                "iataCode": "STB",
+            }
+        ]
+    }
+
+    def do_POST(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+        if self.path == "/v1/security/oauth2/token":
+            self._send_json(self._TOKEN_RESPONSE)
+        else:
+            self.send_error(404, "Unknown endpoint")
+
+    def do_GET(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+        if self.path.startswith("/v2/shopping/flight-offers"):
+            self._send_json(self._FLIGHT_RESPONSE)
+        elif self.path.startswith("/v2/shopping/hotel-offers"):
+            self._send_json(self._HOTEL_RESPONSE)
+        elif self.path.startswith("/v1/reference-data/locations"):
+            self._send_json(self._LOCATION_RESPONSE)
+        elif self.path.startswith("/bookings/"):
+            self._send_json({"status": "ok", "path": self.path})
+        else:
+            self.send_error(404, "Unknown endpoint")
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A003 - signature defined by base class
+        # Silence default logging to keep example output focused.
+        return
+
+    def _send_json(self, payload: Mapping[str, object]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
 class _StubAmadeusServer:
