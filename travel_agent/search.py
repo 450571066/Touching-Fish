@@ -46,6 +46,70 @@ class CompositeSearchProvider(SearchProvider, FlightSearchProvider, HotelSearchP
     pass
 
 
+class DelegatingCompositeSearchProvider(CompositeSearchProvider):
+    """Compose separate providers for generic, flight, and hotel searches."""
+
+    def __init__(
+        self,
+        *,
+        search_provider: SearchProvider,
+        flight_provider: FlightSearchProvider,
+        hotel_provider: HotelSearchProvider,
+    ) -> None:
+        self._search_provider = search_provider
+        self._flight_provider = flight_provider
+        self._hotel_provider = hotel_provider
+
+    def search(
+        self, query: str, *, filters: Mapping[str, object] | None = None
+    ) -> Sequence[Mapping[str, object]]:
+        return self._search_provider.search(query, filters=filters)
+
+    def search_flights(
+        self,
+        *,
+        origin: str,
+        destination: str,
+        departure_date: str,
+        return_date: str | None,
+        travelers: int,
+        cabin: str | None,
+        max_stops: int | None,
+        loyalty_programs: Sequence[str],
+    ) -> Sequence[Mapping[str, object]]:
+        return self._flight_provider.search_flights(
+            origin=origin,
+            destination=destination,
+            departure_date=departure_date,
+            return_date=return_date,
+            travelers=travelers,
+            cabin=cabin,
+            max_stops=max_stops,
+            loyalty_programs=loyalty_programs,
+        )
+
+    def search_hotels(
+        self,
+        *,
+        destination: str,
+        check_in: str,
+        check_out: str,
+        travelers: int,
+        neighborhoods: Sequence[str],
+        amenities: Sequence[str],
+        loyalty_programs: Sequence[str],
+    ) -> Sequence[Mapping[str, object]]:
+        return self._hotel_provider.search_hotels(
+            destination=destination,
+            check_in=check_in,
+            check_out=check_out,
+            travelers=travelers,
+            neighborhoods=neighborhoods,
+            amenities=amenities,
+            loyalty_programs=loyalty_programs,
+        )
+
+
 class InMemorySearchProvider(CompositeSearchProvider):
     """Simple provider backed by an in-memory dataset.
 
