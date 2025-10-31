@@ -136,20 +136,29 @@ class _AmadeusClient:
         token = self._ensure_token()
         url = f"{self._config.hostname}{path}"
         headers = {"Authorization": f"Bearer {token}"}
-        response = self._session.request(
-            method,
-            url,
-            params={k: v for k, v in (params or {}).items() if v not in (None, "")},
-            headers=headers,
-            timeout=self._config.timeout,
-        )
+        try:
+            response = self._session.request(
+                method,
+                url,
+                params={k: v for k, v in (params or {}).items() if v not in (None, "")},
+                headers=headers,
+                timeout=self._config.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ProviderError(f"Failed to contact Amadeus API: {exc}") from exc
         if response.status_code == 401 and retry:
             # Token likely expired – refresh and retry once.
             self._token = None
             self._token_expiry = 0.0
             return self._request(method, path, params=params, retry=False)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:  # pragma: no cover - defensive branch
+            raise ProviderError(f"Amadeus API returned an error: {exc}") from exc
+        try:
+            data = response.json()
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise ProviderError("Invalid JSON payload from Amadeus API") from exc
         if not isinstance(data, MutableMapping):
             raise ProviderError(f"Unexpected response payload from Amadeus: {data!r}")
         return data
@@ -178,6 +187,21 @@ class _AmadeusClient:
         # Refresh the token slightly before it expires to avoid race conditions.
         self._token_expiry = now + max(expires_in - 60, 0)
         return self._token
+
+
+def _normalise_amadeus_url(value: object, *, hostname: str) -> str:
+    """Convert Amadeus link payloads into absolute URLs when possible."""
+
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    if text.startswith(("http://", "https://")):
+        return text
+    if text.startswith("/"):
+        return f"{hostname.rstrip('/')}{text}"
+    return ""
 
 
 class AmadeusFlightSearchProvider(FlightSearchProvider):
@@ -247,8 +271,17 @@ class AmadeusFlightSearchProvider(FlightSearchProvider):
             number = first_segment.get("number", "")
             price = (offer.get("price") or {}).get("total")
             currency = (offer.get("price") or {}).get("currency")
-            links = offer.get("links") or {}
-            booking_url = links.get("self") or f"https://www.amadeus.com/travel/{offer.get('id', '')}"
+            raw_links = offer.get("links")
+            links = raw_links if isinstance(raw_links, Mapping) else {}
+            booking_url = ""
+            for key in ("deeplink", "self"):
+                candidate = _normalise_amadeus_url(
+                    links.get(key),
+                    hostname=self._client._config.hostname,
+                )
+                if candidate:
+                    booking_url = candidate
+                    break
 
             traveler_pricing = offer.get("travelerPricings") or []
             loyalty_cost = None
@@ -359,6 +392,17 @@ class AmadeusHotelSearchProvider(HotelSearchProvider):
                         lng = geo.get("longitude")
                         if lat is not None and lng is not None:
                             location = f"{lat}, {lng}"
+                raw_links = offer.get("links")
+                links = raw_links if isinstance(raw_links, Mapping) else {}
+                booking_url = ""
+                for key in ("deeplink", "self"):
+                    candidate = _normalise_amadeus_url(
+                        links.get(key),
+                        hostname=self._client._config.hostname,
+                    )
+                    if candidate:
+                        booking_url = candidate
+                        break
                 results.append(
                     {
                         "name": hotel.get("name", ""),
@@ -368,13 +412,24 @@ class AmadeusHotelSearchProvider(HotelSearchProvider):
                         "check_out": check_out,
                         "rating": hotel.get("rating"),
                         "location": location,
-                        "booking_url": offer.get("self") or offer.get("id", ""),
+                        "booking_url": booking_url or "",
                         "loyalty_cost": loyalty_cost,
                         "loyalty_program": loyalty_program,
                         "notes": tuple(notes),
                     }
                 )
         return tuple(results)
+
+
+_ALLOWED_LOCATION_FILTERS = frozenset(
+    {
+        "countryCode",
+        "page[offset]",
+        "page[limit]",
+        "sort",
+        "view",
+    }
+)
 
 
 class AmadeusSearchProvider(CompositeSearchProvider):
@@ -388,7 +443,13 @@ class AmadeusSearchProvider(CompositeSearchProvider):
     def search(self, query: str, *, filters: Mapping[str, object] | None = None) -> Sequence[Mapping[str, object]]:
         params = {"keyword": query, "subType": "AIRPORT,CITY"}
         if filters:
-            params.update(filters)
+            params.update(
+                {
+                    key: value
+                    for key, value in filters.items()
+                    if key in _ALLOWED_LOCATION_FILTERS and value not in (None, "")
+                }
+            )
         response = self._client.get("/v1/reference-data/locations", params=params)
         data = response.get("data", [])
         if not isinstance(data, Iterable):
